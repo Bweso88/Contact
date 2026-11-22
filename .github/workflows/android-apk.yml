@@ -40,7 +40,9 @@ jobs:
           cache: true
 
       - name: Générer le projet Android
-        run: flutter create --org org.egliseconnect --platforms android --project-name eglise_connect .
+        run: |
+          flutter create --org org.egliseconnect --platforms android --project-name eglise_connect .
+          rm -f test/widget_test.dart  # exemple généré par flutter create, inutile ici
 
       - name: Réglages Android (permissions, liens tel/sms/WhatsApp, minSdk, nom)
         run: |

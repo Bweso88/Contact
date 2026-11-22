@@ -424,7 +424,7 @@ class ContactCard extends ConsumerWidget {
                     label: 'WhatsApp',
                     bg: HF.sageWash,
                     fg: HF.sageDark,
-                    onTap: canReach ? () => Launcher.whatsapp(context, phone!) : null,
+                    onTap: canReach ? () => Launcher.whatsapp(context, phone) : null,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -432,7 +432,7 @@ class ContactCard extends ConsumerWidget {
                   child: ActionTile(
                     icon: Icons.call_outlined,
                     label: '',
-                    onTap: canReach ? () => Launcher.call(context, phone!) : null,
+                    onTap: canReach ? () => Launcher.call(context, phone) : null,
                   ),
                 ),
                 const SizedBox(width: 8),
