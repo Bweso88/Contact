@@ -107,4 +107,32 @@ class PrayerChainTest extends TestCase
         // Après Marc, le responsable peut prendre la main (gestion des trous de planning).
         $this->assertNotNull(PrayerTurn::take($this->session, $this->responsable, PrayerVisual::Eau));
     }
+
+    public function test_le_tour_se_clot_a_la_fin_du_creneau(): void
+    {
+        $turn = PrayerTurn::take($this->session, $this->marc, PrayerVisual::Feu);
+
+        // Une heure plus tard, le créneau de Marc est terminé et celui de Grâce a commencé.
+        $this->travel(61)->minutes();
+
+        $this->assertTrue($this->session->closeExpiredTurn()?->is($turn));
+        $turn->refresh();
+        $this->assertTrue($turn->auto_ended);
+        $this->assertNotNull($turn->ended_at);
+
+        // La main est libre : on attend que Grâce la prenne.
+        $this->assertTrue($this->session->isWaitingForHand());
+        PrayerTurn::take($this->session, $this->grace, PrayerVisual::Eau);
+        $this->assertFalse($this->session->isWaitingForHand());
+    }
+
+    public function test_grace_peut_prendre_la_main_meme_si_marc_a_oublie_de_la_rendre(): void
+    {
+        PrayerTurn::take($this->session, $this->marc, PrayerVisual::Feu);
+        $this->travel(61)->minutes();
+
+        // take() clôt d'abord le tour expiré de Marc.
+        $turn = PrayerTurn::take($this->session, $this->grace, PrayerVisual::Eau);
+        $this->assertSame($this->grace->id, $turn->user_id);
+    }
 }

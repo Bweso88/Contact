@@ -14,14 +14,42 @@ class PrayerSession extends Model
 {
     use HasUuid, SoftDeletes;
 
-    protected $fillable = ['uuid', 'title', 'description', 'starts_at', 'ends_at', 'whatsapp_group_url', 'created_by'];
+    protected $fillable = ['uuid', 'title', 'description', 'starts_at', 'ends_at', 'end_warning_minutes', 'whatsapp_group_url', 'created_by'];
 
     protected function casts(): array
     {
         return [
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'end_warning_minutes' => 'integer',
         ];
+    }
+
+    /**
+     * Clôt le tour dont le créneau est terminé : « il a fini de prier ».
+     * Appelé avant chaque lecture de l'état en direct et avant chaque prise de main,
+     * ce qui évite une tâche planifiée.
+     */
+    public function closeExpiredTurn(): ?PrayerTurn
+    {
+        $turn = $this->currentTurn()->with('slot')->first();
+        if ($turn === null || $turn->slot === null || $turn->slot->ends_at->isFuture()) {
+            return null;
+        }
+
+        $turn->ended_at = $turn->slot->ends_at;
+        $turn->auto_ended = true;
+        $turn->save();
+
+        return $turn;
+    }
+
+    /** La main est libre alors qu'un créneau a commencé : il faut « prendre la main ». */
+    public function isWaitingForHand(): bool
+    {
+        $slot = $this->slotAt(now());
+
+        return $slot !== null && $this->currentTurn()->doesntExist();
     }
 
     public function creator(): BelongsTo

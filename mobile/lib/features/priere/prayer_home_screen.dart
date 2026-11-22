@@ -3,11 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters.dart';
+import '../../core/prayer_alerts.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../models/prayer.dart';
 import '../../repositories/prayer_repository.dart';
 import '../../services/auth_controller.dart';
+
+/// Programme les alertes de tous mes créneaux à venir dès l'ouverture du module,
+/// même si je n'ouvre pas chaque chaîne.
+final prayerAlertsSchedulerProvider = FutureProvider.autoDispose<void>((ref) async {
+  final me = ref.watch(currentUserProvider);
+  final sessions = await ref.watch(prayerSessionsProvider.future);
+  if (me == null) return;
+  final repo = ref.read(prayerRepositoryProvider);
+  for (final s in sessions.where((s) => s.endsAt.isAfter(DateTime.now()))) {
+    try {
+      await PrayerAlerts.instance.scheduleFor(await repo.watch(s.uuid).first, me.id);
+    } catch (_) {
+      // Hors ligne : les alertes seront programmées à la prochaine ouverture.
+    }
+  }
+});
 
 /// Liste des chaînes de prière (en cours, à venir).
 /// [standalone] : écran d'accueil des comptes intercesseurs, qui n'ont pas accès aux contacts.
@@ -20,6 +37,7 @@ class PrayerHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessions = ref.watch(prayerSessionsProvider);
     final user = ref.watch(currentUserProvider);
+    ref.watch(prayerAlertsSchedulerProvider);
     final now = DateTime.now();
 
     if (user != null && !user.can('prayer.access')) {

@@ -28,6 +28,7 @@ abstract class PrayerRepository {
     required String title,
     String? description,
     String? whatsappGroupUrl,
+    int endWarningMinutes = 5,
     required List<({int userId, DateTime startsAt, DateTime endsAt})> slots,
   });
 }
@@ -98,12 +99,14 @@ class ApiPrayerRepository implements PrayerRepository {
     required String title,
     String? description,
     String? whatsappGroupUrl,
+    int endWarningMinutes = 5,
     required List<({int userId, DateTime startsAt, DateTime endsAt})> slots,
   }) async {
     final res = await _api.post('/api/prayer-sessions', {
       'title': title,
       'description': description,
       'whatsapp_group_url': whatsappGroupUrl,
+      'end_warning_minutes': endWarningMinutes,
       'slots': [
         for (final s in slots)
           {'user_id': s.userId, 'starts_at': s.startsAt.toUtc().toIso8601String(), 'ends_at': s.endsAt.toUtc().toIso8601String()},
@@ -137,105 +140,192 @@ class DemoPrayerRepository implements PrayerRepository {
   final _messages = <String, List<PrayerMessage>>{};
   final _changes = StreamController<String>.broadcast();
 
+  /// En démo, un faux intercesseur attend 45 s avant de prendre la main :
+  /// le temps de voir « Veuillez prendre la main ».
+  static const _fakeDelay = Duration(seconds: 45);
+
   static const _people = [
-    PrayerPerson(id: 101, name: 'Grâce Mabiala'),
-    PrayerPerson(id: 102, name: 'Marc Nkounkou'),
-    PrayerPerson(id: 103, name: 'Prisca Malonga'),
-    PrayerPerson(id: 104, name: 'Jonathan Bouesso'),
-    PrayerPerson(id: 105, name: 'Merveille Samba'),
+    PrayerPerson(id: 101, name: 'Grâce Mabiala', assembly: 'Assemblée de Mafouta'),
+    PrayerPerson(id: 102, name: 'Marc Nkounkou', assembly: 'Assemblée de Mansimou'),
+    PrayerPerson(id: 103, name: 'Prisca Malonga', assembly: 'Assemblée de Kinsoundi'),
+    PrayerPerson(id: 104, name: 'Jonathan Bouesso', assembly: 'Assemblée de Mafouta'),
+    PrayerPerson(id: 105, name: 'Merveille Samba', assembly: 'Assemblée de Moukondo'),
   ];
 
-  PrayerPerson get _mePerson => PrayerPerson(id: _me.id, name: _me.name);
+  PrayerPerson get _mePerson => PrayerPerson(id: _me.id, name: _me.name, assembly: 'Assemblée de Mafouta');
+
+  PrayerSlot _slot(PrayerPerson p, DateTime start, Duration length) =>
+      PrayerSlot(uuid: _uuid.v4(), person: p, startsAt: start, endsAt: start.add(length));
+
+  void _add(
+    PrayerSession s,
+    List<PrayerSlot> slots, {
+    List<PrayerTurn> turns = const [],
+    List<PrayerMessage> messages = const [],
+  }) {
+    _sessions.add(s);
+    _slots[s.uuid] = slots;
+    _turns[s.uuid] = [...turns];
+    _messages[s.uuid] = [...messages];
+  }
 
   void _seed() {
     final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day, now.hour).subtract(const Duration(hours: 1));
 
-    // Session en cours : Grâce a prié, c'est maintenant VOTRE créneau, puis Marc, puis Prisca.
-    final live = PrayerSession(
-      uuid: _uuid.v4(),
-      title: 'Chaîne de prière — ce soir',
-      description: 'Pour les familles du quartier et les nouveaux venus.',
-      startsAt: start,
-      endsAt: start.add(const Duration(hours: 4)),
+    // 1. Essai rapide : créneaux de 3 minutes, alerte 1 minute avant la fin.
+    final t0 = now.add(const Duration(minutes: 1));
+    const len = Duration(minutes: 3);
+    final essai = [_slot(_mePerson, t0, len), _slot(_people[1], t0.add(len), len), _slot(_people[2], t0.add(len * 2), len)];
+    _add(
+      PrayerSession(
+        uuid: _uuid.v4(),
+        title: 'Essai — créneaux de 3 minutes',
+        description: 'Pour tester les alertes : votre tour commence dans 1 minute.',
+        startsAt: t0,
+        endsAt: t0.add(len * 3),
+        endWarningMinutes: 1,
+      ),
+      essai,
+      messages: [
+        PrayerMessage(
+          uuid: _uuid.v4(),
+          person: _people[1],
+          body: 'Testons la chaîne ! Prends la main quand ton tour sonne.',
+          createdAt: now,
+        ),
+      ],
     );
+
+    // 2. Ce soir : Grâce a prié, c'est maintenant votre créneau, puis Marc, puis Prisca.
+    final start = DateTime(now.year, now.month, now.day, now.hour).subtract(const Duration(hours: 1));
     final mine = PrayerSlot(
       uuid: _uuid.v4(),
       person: _mePerson,
       startsAt: now.subtract(const Duration(minutes: 5)),
       endsAt: now.add(const Duration(minutes: 55)),
     );
-    _sessions.add(live);
-    _slots[live.uuid] = [
-      PrayerSlot(uuid: _uuid.v4(), person: _people[0], startsAt: start, endsAt: mine.startsAt),
-      mine,
-      PrayerSlot(uuid: _uuid.v4(), person: _people[1], startsAt: mine.endsAt, endsAt: mine.endsAt.add(const Duration(hours: 1))),
-      PrayerSlot(uuid: _uuid.v4(), person: _people[2], startsAt: mine.endsAt.add(const Duration(hours: 1)), endsAt: live.endsAt),
-    ];
-    _turns[live.uuid] = [
-      PrayerTurn(
+    final grace = PrayerSlot(uuid: _uuid.v4(), person: _people[0], startsAt: start, endsAt: mine.startsAt);
+    _add(
+      PrayerSession(
         uuid: _uuid.v4(),
-        person: _people[0],
-        visual: PrayerVisual.eau,
-        startedAt: start.add(const Duration(minutes: 2)),
-        endedAt: mine.startsAt.subtract(const Duration(minutes: 1)),
-        slotUuid: _slots[live.uuid]![0].uuid,
+        title: 'Chaîne de prière — ce soir',
+        description: 'Pour les familles du quartier et les nouveaux venus.',
+        startsAt: start,
+        endsAt: start.add(const Duration(hours: 4)),
       ),
-    ];
-    _messages[live.uuid] = [
-      PrayerMessage(
-        uuid: _uuid.v4(),
-        person: _people[0],
-        body: 'J’ai prié pour la santé de maman Bouesso. À toi la main 🙏',
-        createdAt: mine.startsAt,
-      ),
-      PrayerMessage(
-        uuid: _uuid.v4(),
-        person: _people[1],
-        body: 'Sujet de ce soir : les jeunes du quartier Mafouta.',
-        createdAt: start,
-      ),
-    ];
-
-    // Session à venir (demain soir).
-    final tomorrow = DateTime(now.year, now.month, now.day + 1, 21);
-    final next = PrayerSession(
-      uuid: _uuid.v4(),
-      title: 'Veillée du vendredi',
-      startsAt: tomorrow,
-      endsAt: tomorrow.add(const Duration(hours: 3)),
-    );
-    _sessions.add(next);
-    _slots[next.uuid] = [
-      for (var i = 0; i < 3; i++)
-        PrayerSlot(
-          uuid: _uuid.v4(),
-          person: i == 1 ? _mePerson : _people[i + 2],
-          startsAt: tomorrow.add(Duration(hours: i)),
-          endsAt: tomorrow.add(Duration(hours: i + 1)),
+      [
+        grace,
+        mine,
+        _slot(_people[1], mine.endsAt, const Duration(hours: 1)),
+        _slot(
+          _people[2],
+          mine.endsAt.add(const Duration(hours: 1)),
+          start.add(const Duration(hours: 4)).difference(mine.endsAt.add(const Duration(hours: 1))),
         ),
-    ];
-    _turns[next.uuid] = [];
-    _messages[next.uuid] = [];
+      ],
+      turns: [
+        PrayerTurn(
+          uuid: _uuid.v4(),
+          person: _people[0],
+          visual: PrayerVisual.eau,
+          startedAt: start.add(const Duration(minutes: 2)),
+          endedAt: mine.startsAt,
+          autoEnded: true,
+          slotUuid: grace.uuid,
+        ),
+      ],
+      messages: [
+        PrayerMessage(
+          uuid: _uuid.v4(),
+          person: _people[0],
+          body: 'J’ai prié pour la santé de maman Bouesso. À toi la main 🙏',
+          createdAt: mine.startsAt,
+        ),
+        PrayerMessage(
+          uuid: _uuid.v4(),
+          person: _people[1],
+          body: 'Sujet de ce soir : les jeunes du quartier Mafouta.',
+          createdAt: start,
+        ),
+      ],
+    );
+
+    // 3. Demain soir.
+    final tomorrow = DateTime(now.year, now.month, now.day + 1, 21);
+    _add(
+      PrayerSession(
+        uuid: _uuid.v4(),
+        title: 'Veillée du vendredi',
+        startsAt: tomorrow,
+        endsAt: tomorrow.add(const Duration(hours: 3)),
+        endWarningMinutes: 10,
+      ),
+      [
+        for (var i = 0; i < 3; i++)
+          _slot(i == 1 ? _mePerson : _people[i + 2], tomorrow.add(Duration(hours: i)), const Duration(hours: 1)),
+      ],
+    );
+  }
+
+  /// Fait vivre la démo : fin automatique des créneaux et faux intercesseurs qui prennent la main.
+  void _advance(String uuid) {
+    final now = DateTime.now();
+    final turns = _turns[uuid]!;
+    final slots = _slots[uuid]!;
+
+    // Fin du créneau : « il a fini de prier ».
+    final i = turns.indexWhere((t) => t.isOpen);
+    if (i >= 0) {
+      final t = turns[i];
+      final slot = slots.where((s) => s.uuid == t.slotUuid).firstOrNull;
+      if (slot != null && !now.isBefore(slot.endsAt)) {
+        turns[i] = PrayerTurn(
+          uuid: t.uuid,
+          person: t.person,
+          visual: t.visual,
+          startedAt: t.startedAt,
+          endedAt: slot.endsAt,
+          slotUuid: t.slotUuid,
+          autoEnded: true,
+        );
+      }
+    }
+
+    // Main libre pendant le créneau d'un faux intercesseur : il la prend après un moment.
+    if (turns.any((t) => t.isOpen)) return;
+    final current = slots.where((s) => s.covers(now)).firstOrNull;
+    if (current == null || current.person.id == _me.id) return;
+    final lastEnd = turns.isEmpty ? current.startsAt : turns.last.endedAt ?? current.startsAt;
+    final waitingSince = lastEnd.isAfter(current.startsAt) ? lastEnd : current.startsAt;
+    if (now.difference(waitingSince) < _fakeDelay) return;
+
+    final visual = current.person.id.isEven ? PrayerVisual.eau : PrayerVisual.feu;
+    turns.add(PrayerTurn(uuid: _uuid.v4(), person: current.person, visual: visual, startedAt: now, slotUuid: current.uuid));
+    _messages[uuid]!.insert(
+      0,
+      PrayerMessage(uuid: _uuid.v4(), person: current.person, body: 'Je prends la main 🙏', createdAt: now),
+    );
   }
 
   PrayerLiveState _state(String uuid) {
-    final turns = _turns[uuid] ?? [];
+    _advance(uuid);
+    final turns = _turns[uuid]!;
     final open = turns.where((t) => t.isOpen).firstOrNull;
-    final session = _sessions.firstWhere((s) => s.uuid == uuid);
+    final s = _sessions.firstWhere((x) => x.uuid == uuid);
     return PrayerLiveState(
       session: PrayerSession(
-        uuid: session.uuid,
-        title: session.title,
-        description: session.description,
-        startsAt: session.startsAt,
-        endsAt: session.endsAt,
-        whatsappGroupUrl: session.whatsappGroupUrl,
+        uuid: s.uuid,
+        title: s.title,
+        description: s.description,
+        startsAt: s.startsAt,
+        endsAt: s.endsAt,
+        endWarningMinutes: s.endWarningMinutes,
+        whatsappGroupUrl: s.whatsappGroupUrl,
         liveTurn: open,
       ),
-      slots: List.unmodifiable(_slots[uuid] ?? const []),
+      slots: List.unmodifiable(_slots[uuid]!),
       turns: List.unmodifiable(turns),
-      messages: List.unmodifiable(_messages[uuid] ?? const []),
+      messages: List.unmodifiable(_messages[uuid]!),
       now: DateTime.now(),
     );
   }
@@ -287,26 +377,6 @@ class DemoPrayerRepository implements PrayerRepository {
       slotUuid: t.slotUuid,
     );
     _changes.add(sessionUuid);
-
-    // Démo : Marc prend le relais quelques secondes plus tard, avec l'eau.
-    Future<void>.delayed(const Duration(seconds: 6), () {
-      if (_state(sessionUuid).currentTurn != null) return;
-      final marcSlot = _slots[sessionUuid]!.where((s) => s.person.id == 102).firstOrNull;
-      _turns[sessionUuid]!.add(
-        PrayerTurn(
-          uuid: _uuid.v4(),
-          person: _people[1],
-          visual: PrayerVisual.eau,
-          startedAt: DateTime.now(),
-          slotUuid: marcSlot?.uuid,
-        ),
-      );
-      _messages[sessionUuid]!.insert(
-        0,
-        PrayerMessage(uuid: _uuid.v4(), person: _people[1], body: 'Merci ! Je prends le relais 🙏', createdAt: DateTime.now()),
-      );
-      _changes.add(sessionUuid);
-    });
   }
 
   @override
@@ -323,6 +393,7 @@ class DemoPrayerRepository implements PrayerRepository {
     required String title,
     String? description,
     String? whatsappGroupUrl,
+    int endWarningMinutes = 5,
     required List<({int userId, DateTime startsAt, DateTime endsAt})> slots,
   }) async {
     final people = await intercessors();
@@ -332,16 +403,14 @@ class DemoPrayerRepository implements PrayerRepository {
       title: title,
       description: description,
       whatsappGroupUrl: whatsappGroupUrl,
+      endWarningMinutes: endWarningMinutes,
       startsAt: sorted.first.startsAt,
       endsAt: sorted.last.endsAt,
     );
-    _sessions.add(s);
-    _slots[s.uuid] = [
+    _add(s, [
       for (final x in sorted)
         PrayerSlot(uuid: _uuid.v4(), person: people.firstWhere((p) => p.id == x.userId), startsAt: x.startsAt, endsAt: x.endsAt),
-    ];
-    _turns[s.uuid] = [];
-    _messages[s.uuid] = [];
+    ]);
     _sessions.sort((a, b) => a.startsAt.compareTo(b.startsAt));
     return s.uuid;
   }

@@ -53,6 +53,11 @@ jobs:
           extra = '''
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+              <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+              <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
           '''
           if 'android.permission.INTERNET' not in s:
               s = re.sub(r'(<manifest[^>]*>)', r'\1' + extra, s, count=1)
@@ -66,6 +71,19 @@ jobs:
           else:
               s = s.replace('</manifest>', '<queries>' + queries + '</queries>\n</manifest>')
           s = re.sub(r'android:label="[^"]*"', 'android:label="Église Connect"', s, count=1)
+          # Récepteurs des alertes programmées (chaîne de prière), y compris après redémarrage.
+          receivers = '''
+              <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+              <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+                  <intent-filter>
+                      <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                      <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                      <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                  </intent-filter>
+              </receiver>
+          '''
+          if 'ScheduledNotificationReceiver' not in s:
+              s = s.replace('</application>', receivers + '</application>', 1)
           m.write_text(s)
 
           for name in ['android/app/build.gradle.kts', 'android/app/build.gradle']:
@@ -74,9 +92,18 @@ jobs:
                   t = g.read_text()
                   t = re.sub(r'minSdk\s*=\s*flutter\.minSdkVersion', 'minSdk = 23', t)
                   t = re.sub(r'minSdkVersion\s+flutter\.minSdkVersion', 'minSdkVersion 23', t)
+                  # flutter_local_notifications exige le « desugaring » des API Java récentes.
+                  if 'CoreLibraryDesugaring' not in t:
+                      if name.endswith('.kts'):
+                          t = t.replace('compileOptions {', 'compileOptions {\n        isCoreLibraryDesugaringEnabled = true', 1)
+                          t += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n'
+                      else:
+                          t = t.replace('compileOptions {', 'compileOptions {\n        coreLibraryDesugaringEnabled true', 1)
+                          t += "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n}\n"
                   g.write_text(t)
           EOF
-          grep -n "minSdk" android/app/build.gradle* || true
+          grep -n "minSdk\|Desugaring" android/app/build.gradle* || true
+          grep -n "Scheduled\|POST_NOTIFICATIONS" android/app/src/main/AndroidManifest.xml || true
 
       # Même clé de signature d'une version à l'autre : les mises à jour s'installent
       # par-dessus l'ancienne version sans la désinstaller.

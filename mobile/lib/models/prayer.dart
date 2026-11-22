@@ -18,14 +18,18 @@ DateTime _d(Object? v) => DateTime.parse(v as String).toLocal();
 DateTime? _dn(Object? v) => v == null ? null : _d(v);
 
 class PrayerPerson {
-  const PrayerPerson({required this.id, required this.name});
+  const PrayerPerson({required this.id, required this.name, this.assembly});
 
   final int id;
   final String name;
 
+  /// Assemblée de l'intercesseur, affichée pendant qu'il prie.
+  final String? assembly;
+
   String get initials => name.split(' ').where((p) => p.isNotEmpty).take(2).map((p) => p[0]).join().toUpperCase();
 
-  factory PrayerPerson.fromJson(Map<String, dynamic> j) => PrayerPerson(id: j['id'] as int, name: j['name'] as String);
+  factory PrayerPerson.fromJson(Map<String, dynamic> j) =>
+      PrayerPerson(id: j['id'] as int, name: j['name'] as String, assembly: j['assembly'] as String?);
 }
 
 class PrayerSession {
@@ -35,6 +39,7 @@ class PrayerSession {
     this.description,
     required this.startsAt,
     required this.endsAt,
+    this.endWarningMinutes = 5,
     this.whatsappGroupUrl,
     this.liveTurn,
   });
@@ -44,6 +49,9 @@ class PrayerSession {
   final String? description;
   final DateTime startsAt;
   final DateTime endsAt;
+
+  /// Alerte « votre temps finit dans X min », réglée par l'organisateur.
+  final int endWarningMinutes;
   final String? whatsappGroupUrl;
 
   /// Tour en cours (pour l'aperçu dans la liste).
@@ -57,6 +65,7 @@ class PrayerSession {
     description: j['description'] as String?,
     startsAt: _d(j['starts_at']),
     endsAt: _d(j['ends_at']),
+    endWarningMinutes: (j['end_warning_minutes'] as int?) ?? 5,
     whatsappGroupUrl: j['whatsapp_group_url'] as String?,
     liveTurn: j['current_turn'] == null ? null : PrayerTurn.fromJson(j['current_turn'] as Map<String, dynamic>),
   );
@@ -102,6 +111,9 @@ class PrayerTurn {
   final DateTime? endedAt;
   final String? slotUuid;
 
+  /// Clos automatiquement à la fin du créneau.
+  final bool autoEnded;
+
   bool get isOpen => endedAt == null;
   Duration duration(DateTime now) => (endedAt ?? now).difference(startedAt);
 
@@ -112,6 +124,7 @@ class PrayerTurn {
     startedAt: _d(j['started_at']),
     endedAt: _dn(j['ended_at']),
     slotUuid: j['slot_uuid'] as String?,
+    autoEnded: (j['auto_ended'] as bool?) ?? false,
   );
 }
 
@@ -177,6 +190,25 @@ class PrayerLiveState {
   PrayerSlot? openSlotOf(int userId) {
     for (final s in slots) {
       if (s.person.id == userId && s.isOpenAt(now)) return s;
+    }
+    return null;
+  }
+
+  /// Dernier tour terminé (pour afficher « … a fini de prier »).
+  PrayerTurn? get lastFinishedTurn {
+    for (final t in turns.reversed) {
+      if (!t.isOpen) return t;
+    }
+    return null;
+  }
+
+  /// La main est libre alors qu'un créneau a commencé : « Veuillez prendre la main ».
+  bool get waitingForHand => currentTurn == null && currentSlot != null;
+
+  /// Temps restant dans le créneau du tour en cours.
+  Duration? remainingFor(PrayerTurn turn) {
+    for (final s in slots) {
+      if (s.uuid == turn.slotUuid) return s.endsAt.difference(now);
     }
     return null;
   }

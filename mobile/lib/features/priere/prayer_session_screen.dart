@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/formatters.dart';
+import '../../core/prayer_alerts.dart';
 import '../../core/theme.dart';
 import '../../models/app_user.dart';
 import '../../models/prayer.dart';
@@ -41,6 +42,33 @@ class PrayerSessionScreen extends ConsumerStatefulWidget {
 class _PrayerSessionScreenState extends ConsumerState<PrayerSessionScreen> {
   final _message = TextEditingController();
   bool _busy = false;
+  String? _scheduledSignature;
+  DateTime? _lastNudge;
+
+  /// Reprogramme les alertes quand le planning ou le tour en cours change (pas à chaque seconde).
+  void _onState(PrayerLiveState st) {
+    final me = ref.read(currentUserProvider);
+    if (me == null) return;
+    final sig = [
+      st.session.endWarningMinutes,
+      for (final s in st.slots) '${s.uuid}${s.person.id}${s.startsAt.millisecondsSinceEpoch}${s.endsAt.millisecondsSinceEpoch}',
+      st.currentTurn?.uuid,
+    ].join('|');
+    if (sig != _scheduledSignature) {
+      _scheduledSignature = sig;
+      unawaited(PrayerAlerts.instance.scheduleFor(st, me.id));
+    }
+
+    // Écran ouvert, c'est mon créneau et la main est libre : on insiste toutes les 2 minutes.
+    final slot = st.currentSlot;
+    if (st.waitingForHand && slot != null && slot.person.id == me.id) {
+      final now = DateTime.now();
+      if (_lastNudge == null || now.difference(_lastNudge!) > const Duration(minutes: 2)) {
+        _lastNudge = now;
+        unawaited(PrayerAlerts.instance.showNow(st.session.title, 'C’est votre tour : veuillez prendre la main 🔥'));
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -78,6 +106,10 @@ class _PrayerSessionScreenState extends ConsumerState<PrayerSessionScreen> {
     );
     if (visual == null) return;
     await _run(() => _repo.takeHand(widget.uuid, visual));
+    final st = ref.read(prayerLiveProvider(widget.uuid)).valueOrNull;
+    final me = ref.read(currentUserProvider);
+    final slot = st == null || me == null ? null : st.openSlotOf(me.id);
+    if (slot != null) unawaited(PrayerAlerts.instance.cancelTakeReminders(slot));
   }
 
   Future<void> _release() async {
@@ -123,6 +155,10 @@ class _PrayerSessionScreenState extends ConsumerState<PrayerSessionScreen> {
   Widget build(BuildContext context) {
     final live = ref.watch(prayerLiveProvider(widget.uuid));
     final me = ref.watch(currentUserProvider);
+    ref.listen(prayerLiveProvider(widget.uuid), (_, next) {
+      final st = next.valueOrNull;
+      if (st != null) _onState(st);
+    });
 
     return Theme(
       data: Theme.of(context).copyWith(
@@ -178,26 +214,53 @@ class _PrayerSessionScreenState extends ConsumerState<PrayerSessionScreen> {
             textAlign: TextAlign.center,
             style: HF.heading(26, color: _Night.text),
           ),
+          if (current.person.assembly != null)
+            Text(
+              current.person.assembly!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: _Night.text, fontSize: 15),
+            ),
           const SizedBox(height: 4),
           Text(
             '${mine ? 'Vous priez' : 'prie'} depuis ${_duration(current.duration(st.now))} · ${current.visual.label}',
             textAlign: TextAlign.center,
             style: TextStyle(color: accent, fontWeight: FontWeight.w600, fontSize: 15),
           ),
+          if (st.remainingFor(current) case final left? when !left.isNegative) ...[
+            const SizedBox(height: 10),
+            Center(
+              child: _RemainingPill(
+                left: left,
+                warn: Duration(minutes: st.session.endWarningMinutes),
+              ),
+            ),
+          ],
         ] else ...[
-          Text(
-            'La flamme attend…',
-            textAlign: TextAlign.center,
-            style: HF.heading(24, color: _Night.text),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            st.currentSlot == null
-                ? 'Aucun créneau en ce moment.'
-                : 'Créneau de ${st.currentSlot!.person.id == me.id ? 'vous' : st.currentSlot!.person.name}',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: _Night.muted),
-          ),
+          if (st.waitingForHand)
+            _WaitingBanner(slot: st.currentSlot!, isMe: st.currentSlot!.person.id == me.id)
+          else
+            Text(
+              'La flamme attend…',
+              textAlign: TextAlign.center,
+              style: HF.heading(24, color: _Night.text),
+            ),
+          if (st.lastFinishedTurn case final done? when st.now.difference(done.endedAt!) < const Duration(minutes: 15)) ...[
+            const SizedBox(height: 12),
+            Text(
+              '✓ ${done.person.id == me.id ? 'Vous avez' : '${done.person.name} a'} fini de prier'
+              '${done.autoEnded ? ' (temps écoulé)' : ''} · ${_duration(done.duration(st.now))}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF81C784), fontWeight: FontWeight.w600),
+            ),
+          ],
+          if (!st.waitingForHand && st.currentSlot == null) ...[
+            const SizedBox(height: 4),
+            const Text(
+              'Aucun créneau en ce moment.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _Night.muted),
+            ),
+          ],
         ],
         const SizedBox(height: 24),
         _actions(st, me, current, mine, mySlot, nextMine, canManage),
@@ -552,4 +615,92 @@ class _Offline extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Temps restant dans le créneau ; passe à l'orange quand l'alerte de fin approche.
+class _RemainingPill extends StatelessWidget {
+  const _RemainingPill({required this.left, required this.warn});
+
+  final Duration left;
+  final Duration warn;
+
+  @override
+  Widget build(BuildContext context) {
+    final urgent = left <= warn;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: urgent ? const Color(0xFF4A2A1A) : _Night.card,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: urgent ? _Night.fire : _Night.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(urgent ? Icons.alarm : Icons.timer_outlined, size: 16, color: urgent ? _Night.fire : _Night.muted),
+          const SizedBox(width: 6),
+          Text(
+            left.inMinutes >= 1 ? 'Reste ${_duration(left)}' : 'Reste ${left.inSeconds} s',
+            style: TextStyle(color: urgent ? _Night.fire : _Night.text, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// « Veuillez prendre la main » : clignote tant que personne ne la prend.
+class _WaitingBanner extends StatefulWidget {
+  const _WaitingBanner({required this.slot, required this.isMe});
+
+  final PrayerSlot slot;
+  final bool isMe;
+
+  @override
+  State<_WaitingBanner> createState() => _WaitingBannerState();
+}
+
+class _WaitingBannerState extends State<_WaitingBanner> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
+    ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween(begin: 0.55, end: 1.0).animate(_pulse),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF4A2A1A),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _Night.fire, width: 1.5),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.notifications_active, color: _Night.fire, size: 30),
+            const SizedBox(height: 6),
+            Text(
+              'Veuillez prendre la main',
+              textAlign: TextAlign.center,
+              style: HF.heading(22, color: Colors.white),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.isMe
+                  ? 'C’est votre créneau (${formatTime(widget.slot.startsAt)} – ${formatTime(widget.slot.endsAt)}).'
+                  : 'Créneau de ${widget.slot.person.name}${widget.slot.person.assembly != null ? ' · ${widget.slot.person.assembly}' : ''}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: _Night.text),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

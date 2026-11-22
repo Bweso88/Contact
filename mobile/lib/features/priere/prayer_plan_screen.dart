@@ -26,6 +26,7 @@ class _PrayerPlanScreenState extends ConsumerState<PrayerPlanScreen> {
   final _whatsapp = TextEditingController();
   late DateTime _start = _defaultStart();
   int _slotMinutes = 60;
+  int _warnMinutes = 5;
   final List<int?> _assignees = [null, null, null];
   bool _saving = false;
 
@@ -75,6 +76,7 @@ class _PrayerPlanScreenState extends ConsumerState<PrayerPlanScreen> {
             title: _title.text.trim(),
             description: _description.text.trim().isEmpty ? null : _description.text.trim(),
             whatsappGroupUrl: _whatsapp.text.trim().isEmpty ? null : _whatsapp.text.trim(),
+            endWarningMinutes: _warnMinutes,
             slots: [
               for (var i = 0; i < _assignees.length; i++)
                 (userId: _assignees[i]!, startsAt: _slotStart(i), endsAt: _slotStart(i + 1)),
@@ -151,6 +153,36 @@ class _PrayerPlanScreenState extends ConsumerState<PrayerPlanScreen> {
                         onTap: () => setState(() => _slotMinutes = m),
                       ),
                   ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          HFCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SectionHeader(
+                  icon: Icons.notifications_active_outlined,
+                  title: 'Alerte sonore avant la fin',
+                  subtitle: '« Votre temps finit dans X minutes »',
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final m in [0, 1, 2, 5, 10, 15])
+                      QuickChip(
+                        label: m == 0 ? 'Aucune' : '$m min',
+                        selected: _warnMinutes == m,
+                        onTap: () => setState(() => _warnMinutes = m),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Chaque intercesseur est aussi prévenu 10 min avant son créneau, puis au début tant qu’il n’a pas pris la main.',
+                  style: TextStyle(fontSize: 12, color: HF.muted),
                 ),
               ],
             ),

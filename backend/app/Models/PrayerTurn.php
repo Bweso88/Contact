@@ -17,7 +17,7 @@ class PrayerTurn extends Model
 {
     use HasUuid;
 
-    protected $fillable = ['uuid', 'prayer_session_id', 'prayer_slot_id', 'user_id', 'visual', 'started_at', 'ended_at'];
+    protected $fillable = ['uuid', 'prayer_session_id', 'prayer_slot_id', 'user_id', 'visual', 'started_at', 'ended_at', 'auto_ended'];
 
     protected function casts(): array
     {
@@ -25,6 +25,7 @@ class PrayerTurn extends Model
             'visual' => PrayerVisual::class,
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
+            'auto_ended' => 'boolean',
         ];
     }
 
@@ -70,6 +71,9 @@ class PrayerTurn extends Model
         if ($slot === null && ! $isManager) {
             throw new DomainException('Ce n’est pas encore votre créneau de prière.');
         }
+
+        // Le précédent a dépassé la fin de son créneau : son tour se clôt d'abord.
+        $session->closeExpiredTurn();
 
         $current = $session->currentTurn()->first();
         if ($current !== null) {
