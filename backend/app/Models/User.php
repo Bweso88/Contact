@@ -17,7 +17,7 @@ class User extends Authenticatable
 {
     use Auditable, HasApiTokens, HasFactory, HasUuid, Notifiable, SoftDeletes;
 
-    protected $fillable = ['uuid', 'name', 'username', 'email', 'phone', 'password', 'is_active'];
+    protected $fillable = ['uuid', 'name', 'username', 'email', 'phone', 'assembly', 'password', 'is_active'];
 
     protected $hidden = ['password', 'remember_token'];
 

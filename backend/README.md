@@ -45,6 +45,7 @@ Puis :
 ```bash
 php artisan migrate --seed       # en local : ajoute aussi les données de démo
 php artisan test --filter=ContactRulesTest
+php artisan test --filter=PrayerChainTest
 ```
 
 Lance le seeding **avant** `php artisan config:cache` : une fois la config en cache,
@@ -52,6 +53,8 @@ Lance le seeding **avant** `php artisan config:cache` : une fois la config en ca
 
 Comptes de démo (environnement `local` seulement, mot de passe `password`) :
 `pasteur`, `resp.evang`, `resp.accueil`, `resp.suivi`, `evangeliste1..4`, `accueil1..2`.
+
+Rôles de la chaîne de prière : `responsable_priere` (planifie) et `intercesseur` (ne voit que ce module).
 
 ## Les quatre décisions du cahier des charges
 
@@ -81,6 +84,7 @@ Aucune n'est figée dans le schéma : elles sont dans la table `settings`.
 | `consents` | Autorisations de contact et leur retrait |
 | `audit_logs` | Traçabilité des modifications |
 | `notifications`, `devices` | Notifications Laravel et jetons Firebase |
+| `prayer_sessions`, `prayer_slots`, `prayer_turns`, `prayer_messages` | Chaîne de prière : planning, tours « Je prends / rends la main » (une seule main à la fois, garantie par un index unique), mur de messages |
 
 ## Choix techniques à connaître
 

@@ -11,29 +11,41 @@ import '../models/enums.dart';
 /// Données fictives du mode démonstration (aucun serveur configuré).
 /// Marquées « synced » : elles ne partent jamais vers une API.
 abstract final class DemoData {
-  static AppUser user(String username) => AppUser(
-    id: 1,
-    name: username.trim().isEmpty ? 'Démo' : _capitalize(username.trim()),
-    username: username.trim().isEmpty ? 'demo' : username.trim(),
-    roles: const ['responsable_eglise'],
-    permissions: const [
-      'dashboard.view_global',
-      'reports.view',
-      'contacts.create',
-      'contacts.view_all',
-      'contacts.update',
-      'contacts.assign',
-      'follow_ups.create',
-      'follow_ups.update_own',
-      'follow_ups.update_all',
-      'consents.manage',
-      'teams.view',
-      'house_churches.view',
-      'integrations.propose',
-      'integrations.confirm',
-    ],
-    teams: const [UserTeam(id: 1, name: 'Équipe évangélisation A', isLeader: true)],
-  );
+  /// Identifiant contenant « interc » (ex. « intercesseur ») : compte limité à la chaîne de prière.
+  static AppUser user(String username) => username.toLowerCase().contains('interc')
+      ? AppUser(
+          id: 1,
+          name: 'Intercesseur Démo',
+          username: username.trim(),
+          roles: const ['intercesseur'],
+          permissions: const ['prayer.access'],
+        )
+      : AppUser(
+          id: 1,
+          name: username.trim().isEmpty ? 'Démo' : _capitalize(username.trim()),
+          username: username.trim().isEmpty ? 'demo' : username.trim(),
+          roles: const ['responsable_eglise'],
+          permissions: const [
+            'dashboard.view_global',
+            'reports.view',
+            'contacts.create',
+            'contacts.view_all',
+            'contacts.update',
+            'contacts.assign',
+            'follow_ups.create',
+            'follow_ups.update_own',
+            'follow_ups.update_all',
+            'consents.manage',
+            'teams.view',
+            'house_churches.view',
+            'integrations.propose',
+            'integrations.confirm',
+            'prayer.access',
+            'prayer.manage',
+            'contacts.export',
+          ],
+          teams: const [UserTeam(id: 1, name: 'Équipe évangélisation A', isLeader: true)],
+        );
 
   static const _people = [
     ('Grâce', 'Mabiala', 'Mafouta', ContactStatus.aContacter, ContactSource.evangelisation),

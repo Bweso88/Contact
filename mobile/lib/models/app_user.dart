@@ -21,6 +21,10 @@ class AppUser {
   /// Sert uniquement à adapter l'interface : le serveur revérifie toujours.
   bool can(String permission) => isAdmin || permissions.contains(permission);
 
+  /// Compte limité à la chaîne de prière : ne voit pas les contacts.
+  bool get isIntercessorOnly =>
+      can('prayer.access') && !can('contacts.create') && !can('contacts.view_own') && !can('contacts.view_all');
+
   UserTeam? get primaryTeam => teams.isEmpty ? null : teams.first;
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(

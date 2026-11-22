@@ -11,6 +11,8 @@ enum RoleSlug: string
     case ResponsableSuivi = 'responsable_suivi';
     case Evangeliste = 'evangeliste';
     case AgentAccueil = 'agent_accueil';
+    case ResponsablePriere = 'responsable_priere';
+    case Intercesseur = 'intercesseur';
 
     public function label(): string
     {
@@ -22,6 +24,8 @@ enum RoleSlug: string
             self::ResponsableSuivi => 'Responsable suivi',
             self::Evangeliste => 'Évangéliste',
             self::AgentAccueil => 'Agent d’accueil',
+            self::ResponsablePriere => 'Responsable prière',
+            self::Intercesseur => 'Intercesseur',
         };
     }
 }

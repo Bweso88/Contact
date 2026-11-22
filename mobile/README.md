@@ -175,6 +175,59 @@ Règles côté serveur :
 - **Permissions** : chaque opération est vérifiée comme un appel normal ; `changes` ne contient que ce que l'utilisateur a le droit de voir.
 - `status_change` vers `integre` est toujours refusé (il passe par la confirmation d'intégration).
 
+## Export Excel
+
+Bouton ⬇ dans la barre du haut : le fichier `.xlsx` s'ouvre dans le partage du téléphone
+(WhatsApp, e-mail, Google Drive, Fichiers…).
+
+| Liste | Contenu | Permission |
+|---|---|---|
+| Contacts | La liste affichée (même recherche, même filtre), toutes colonnes utiles | `contacts.export` |
+| Suivi | Relances en retard, du jour et à venir | `contacts.export` |
+| Bilan | Indicateurs de la période + répartition par statut | `reports.view` |
+| Chaîne de prière | Planning, tours (feu/eau, durées), messages | `prayer.manage` |
+
+Les exports contiennent des données personnelles : ils restent réservés à ces rôles (cahier des charges, section 8).
+
+## Chaîne de prière
+
+Module à part pour les intercesseurs, qui prient chacun chez soi, l'un après l'autre.
+
+- Le **responsable prière** planifie une chaîne : créneaux consécutifs attribués aux intercesseurs (bouton « Planifier »).
+- Pendant son créneau (dès 10 min avant), l'intercesseur touche **Je prends la main** et choisit **feu** ou **eau**.
+- Tout le monde voit l'animation, son nom et depuis combien de temps il prie. Aucun son n'est transmis.
+- Il touche **Je rends la main** ; le suivant prend le relais. Une seule main à la fois (garanti par la base de données).
+- Mur de messages dans la session, avec partage vers WhatsApp (ou ouverture du groupe si son lien est renseigné).
+- Un compte **intercesseur** ne voit que ce module, pas les contacts.
+
+Mode démo : se connecter avec l'identifiant `intercesseur` pour voir l'expérience d'un compte intercesseur ;
+avec un autre identifiant, l'onglet **Prière** apparaît à côté des contacts. Dans la chaîne « ce soir »,
+c'est votre créneau : prenez la main, rendez-la, et Marc prend le relais avec l'eau.
+
+**Alertes sonores** (programmées sur le téléphone, elles sonnent même application fermée) :
+10 min avant mon créneau ; au début puis à +2, +5 et +10 min « Veuillez prendre la main » tant que je ne l'ai pas prise ;
+« Votre temps finit dans X min » (X réglé par l'organisateur dans le planning) ; fin du temps.
+À la fin du créneau, le tour se clôt tout seul (« a fini de prier ») et le bandeau « Veuillez prendre la main »
+clignote pour tous tant que le suivant n'a pas pris la main. Le nom de l'assemblée s'affiche sous celui de la personne qui prie.
+
+Une alerte n'est programmée qu'après une ouverture du module par l'intercesseur. Pour prévenir aussi ceux qui
+n'ouvrent pas l'appli, il faudra des notifications push (Firebase Cloud Messaging, prévu au cahier des charges).
+
+Ce module fonctionne **en direct** : il faut Internet. L'application interroge le serveur toutes les 4 secondes
+(passage aux WebSockets avec Laravel Reverb possible plus tard).
+
+### API attendue
+
+| Méthode | Endpoint | Rôle |
+|---|---|---|
+| GET | `/api/prayer-sessions` | `{ data: [ { uuid, title, description, starts_at, ends_at, end_warning_minutes, whatsapp_group_url, current_turn } ] }` |
+| GET | `/api/prayer-sessions/{uuid}/live` | `{ server_time, session, slots: [ { uuid, user: {id,name,assembly}, starts_at, ends_at } ], turns: [ { uuid, user, visual, started_at, ended_at, auto_ended, slot_uuid } ], messages: [ { uuid, user, body, created_at } ] }` (50 derniers messages, du plus récent au plus ancien) — appeler `closeExpiredTurn()` avant de répondre |
+| POST | `/api/prayer-sessions/{uuid}/take` | `{ visual: "feu" \| "eau" }` → `PrayerTurn::take()` ; 422 avec `message` si refusé |
+| POST | `/api/prayer-sessions/{uuid}/release` | → `PrayerTurn::release()` |
+| POST | `/api/prayer-sessions/{uuid}/messages` | `{ body }` |
+| GET | `/api/prayer-sessions/intercessors` | `{ data: [ { id, name } ] }` (permission `prayer.manage`) |
+| POST | `/api/prayer-sessions` | `{ title, description, whatsapp_group_url, end_warning_minutes, slots: [ { user_id, starts_at, ends_at } ] }` → `{ data: { uuid } }` |
+
 ## Ce qu'il faut vérifier à la première compilation
 
 Le code a été écrit sans pouvoir lancer Flutter. Les modèles, les enums et la normalisation
