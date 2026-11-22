@@ -44,6 +44,9 @@ class RolePermissionSeeder extends Seeder
         'house_churches.manage' => ['Gérer les églises de maison', 'organisation'],
         'integrations.propose' => ['Proposer une intégration', 'organisation'],
         'integrations.confirm' => ['Confirmer une intégration', 'organisation'],
+
+        'prayer.access' => ['Participer à la chaîne de prière', 'priere'],
+        'prayer.manage' => ['Planifier les chaînes de prière', 'priere'],
     ];
 
     private function matrix(): array
@@ -84,6 +87,10 @@ class RolePermissionSeeder extends Seeder
             RoleSlug::AgentAccueil->value => [
                 'contacts.create', 'contacts.view_own', 'consents.manage',
             ],
+
+            // Module à part : un intercesseur ne voit pas les contacts.
+            RoleSlug::ResponsablePriere->value => ['prayer.access', 'prayer.manage'],
+            RoleSlug::Intercesseur->value => ['prayer.access'],
         ];
     }
 
