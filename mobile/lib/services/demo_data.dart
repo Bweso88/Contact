@@ -15,7 +15,7 @@ abstract final class DemoData {
   static AppUser user(String username) => username.toLowerCase().contains('interc')
       ? AppUser(
           id: 1,
-          name: 'Intercesseur Démo',
+          name: 'Sœur Démo',
           username: username.trim(),
           roles: const ['intercesseur'],
           permissions: const ['prayer.access'],

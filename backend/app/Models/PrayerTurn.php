@@ -57,7 +57,7 @@ class PrayerTurn extends Model
     public static function take(PrayerSession $session, User $user, PrayerVisual $visual): self
     {
         if (! $user->isAdmin() && ! $user->hasPermission('prayer.access')) {
-            throw new AuthorizationException('Réservé aux intercesseurs.');
+            throw new AuthorizationException('Réservé aux intercesseurs et intercesseuses.');
         }
 
         $now = now();
@@ -80,7 +80,7 @@ class PrayerTurn extends Model
             throw new DomainException(
                 $current->user_id === $user->id
                     ? 'Vous tenez déjà la main.'
-                    : $current->user->name.' prie en ce moment. Attendez qu’il rende la main.'
+                    : $current->user->name.' prie en ce moment. Attendez que la main soit rendue.'
             );
         }
 
@@ -107,7 +107,7 @@ class PrayerTurn extends Model
 
         $isManager = $by->isAdmin() || $by->hasPermission('prayer.manage');
         if ($this->user_id !== $by->id && ! $isManager) {
-            throw new AuthorizationException('Seul celui qui prie peut rendre la main.');
+            throw new AuthorizationException('Seule la personne qui prie peut rendre la main.');
         }
 
         $this->ended_at = now();

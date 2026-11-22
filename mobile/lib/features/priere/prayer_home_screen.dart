@@ -45,8 +45,8 @@ class PrayerHomeScreen extends ConsumerWidget {
         appBar: HFTopBar(),
         body: EmptyState(
           icon: Icons.lock_outline,
-          title: 'Réservé aux intercesseurs',
-          message: 'Demandez au responsable prière de vous ajouter.',
+          title: 'Réservé aux intercesseurs et intercesseuses',
+          message: 'Demandez à la personne responsable de la prière de vous ajouter.',
         ),
       );
     }
@@ -94,7 +94,7 @@ class PrayerHomeScreen extends ConsumerWidget {
                       const EmptyState(
                         icon: Icons.local_fire_department_outlined,
                         title: 'Aucune chaîne prévue',
-                        message: 'Le responsable prière publiera le prochain planning.',
+                        message: 'La personne responsable de la prière publiera le prochain planning.',
                       ),
                     ]
                   : [

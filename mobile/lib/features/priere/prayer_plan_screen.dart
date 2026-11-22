@@ -181,7 +181,7 @@ class _PrayerPlanScreenState extends ConsumerState<PrayerPlanScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Chaque intercesseur est aussi prévenu 10 min avant son créneau, puis au début tant qu’il n’a pas pris la main.',
+                  'Chacun et chacune reçoit aussi une alerte 10 min avant son créneau, puis au début tant que la main n’est pas prise.',
                   style: TextStyle(fontSize: 12, color: HF.muted),
                 ),
               ],

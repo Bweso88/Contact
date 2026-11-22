@@ -352,7 +352,7 @@ class _PrayerSessionScreenState extends ConsumerState<PrayerSessionScreen> {
     }
     final String info;
     if (mySlot != null && current != null) {
-      info = '${current.person.name} prie encore. La main vous reviendra quand il la rendra.';
+      info = '${current.person.name} prie encore. La main vous reviendra dès qu’elle sera rendue.';
     } else if (nextMine != null) {
       final wait = nextMine.startsAt.difference(st.now);
       info =

@@ -202,7 +202,7 @@ Module à part pour les intercesseurs, qui prient chacun chez soi, l'un après l
 
 Mode démo : se connecter avec l'identifiant `intercesseur` pour voir l'expérience d'un compte intercesseur ;
 avec un autre identifiant, l'onglet **Prière** apparaît à côté des contacts. Dans la chaîne « ce soir »,
-c'est votre créneau : prenez la main, rendez-la, et Marc prend le relais avec l'eau.
+c'est votre créneau : prenez la main, rendez-la, et Prisca prend le relais.
 
 **Alertes sonores** (programmées sur le téléphone, elles sonnent même application fermée) :
 10 min avant mon créneau ; au début puis à +2, +5 et +10 min « Veuillez prendre la main » tant que je ne l'ai pas prise ;

@@ -182,6 +182,8 @@ class ProfileScreen extends ConsumerWidget {
     'responsable_suivi' => 'Resp. suivi',
     'evangeliste' => 'Évangéliste',
     'agent_accueil' => 'Agent d’accueil',
+    'responsable_priere' => 'Responsable prière',
+    'intercesseur' => 'Intercesseur / intercesseuse',
     _ => slug,
   };
 }

@@ -62,7 +62,7 @@ class ContactDetailScreen extends ConsumerWidget {
             ? const EmptyState(
                 icon: Icons.person_off_outlined,
                 title: 'Contact introuvable',
-                message: 'Il a peut-être été retiré de votre périmètre.',
+                message: 'Ce dossier a peut-être été retiré de votre périmètre.',
               )
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

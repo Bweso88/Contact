@@ -25,7 +25,7 @@ enum RoleSlug: string
             self::Evangeliste => 'Évangéliste',
             self::AgentAccueil => 'Agent d’accueil',
             self::ResponsablePriere => 'Responsable prière',
-            self::Intercesseur => 'Intercesseur',
+            self::Intercesseur => 'Intercesseur / intercesseuse',
         };
     }
 }

@@ -175,7 +175,7 @@ class DemoPrayerRepository implements PrayerRepository {
     // 1. Essai rapide : créneaux de 3 minutes, alerte 1 minute avant la fin.
     final t0 = now.add(const Duration(minutes: 1));
     const len = Duration(minutes: 3);
-    final essai = [_slot(_mePerson, t0, len), _slot(_people[1], t0.add(len), len), _slot(_people[2], t0.add(len * 2), len)];
+    final essai = [_slot(_mePerson, t0, len), _slot(_people[2], t0.add(len), len), _slot(_people[1], t0.add(len * 2), len)];
     _add(
       PrayerSession(
         uuid: _uuid.v4(),
@@ -189,7 +189,7 @@ class DemoPrayerRepository implements PrayerRepository {
       messages: [
         PrayerMessage(
           uuid: _uuid.v4(),
-          person: _people[1],
+          person: _people[2],
           body: 'Testons la chaîne ! Prends la main quand ton tour sonne.',
           createdAt: now,
         ),
@@ -216,9 +216,9 @@ class DemoPrayerRepository implements PrayerRepository {
       [
         grace,
         mine,
-        _slot(_people[1], mine.endsAt, const Duration(hours: 1)),
+        _slot(_people[2], mine.endsAt, const Duration(hours: 1)),
         _slot(
-          _people[2],
+          _people[1],
           mine.endsAt.add(const Duration(hours: 1)),
           start.add(const Duration(hours: 4)).difference(mine.endsAt.add(const Duration(hours: 1))),
         ),
