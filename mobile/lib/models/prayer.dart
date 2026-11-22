@@ -102,6 +102,7 @@ class PrayerTurn {
     required this.startedAt,
     this.endedAt,
     this.slotUuid,
+    this.autoEnded = false,
   });
 
   final String uuid;
