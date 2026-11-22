@@ -1,0 +1,130 @@
+# Construit l'APK Android de l'application mobile et le publie dans les Releases du dépôt.
+# Téléchargement depuis le téléphone : https://github.com/Bweso88/Contact/releases/latest
+#
+# Se lance à chaque modification de mobile/ et manuellement (onglet Actions › Run workflow).
+# Sans API_BASE_URL (variable du dépôt), l'APK démarre en mode démonstration.
+
+name: APK Android
+
+on:
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Générer le projet Android
+        run: flutter create --org org.egliseconnect --platforms android --project-name eglise_connect .
+
+      - name: Réglages Android (permissions, liens tel/sms/WhatsApp, minSdk, nom)
+        run: |
+          python3 - <<'EOF'
+          import re, pathlib
+          m = pathlib.Path('android/app/src/main/AndroidManifest.xml')
+          s = m.read_text()
+          extra = '''
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+          '''
+          if 'android.permission.INTERNET' not in s:
+              s = re.sub(r'(<manifest[^>]*>)', r'\1' + extra, s, count=1)
+          queries = '''
+              <intent><action android:name="android.intent.action.DIAL" /><data android:scheme="tel" /></intent>
+              <intent><action android:name="android.intent.action.SENDTO" /><data android:scheme="sms" /></intent>
+              <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="https" /></intent>
+          '''
+          if '<queries>' in s:
+              s = s.replace('<queries>', '<queries>' + queries, 1)
+          else:
+              s = s.replace('</manifest>', '<queries>' + queries + '</queries>\n</manifest>')
+          s = re.sub(r'android:label="[^"]*"', 'android:label="Église Connect"', s, count=1)
+          m.write_text(s)
+
+          for name in ['android/app/build.gradle.kts', 'android/app/build.gradle']:
+              g = pathlib.Path(name)
+              if g.exists():
+                  t = g.read_text()
+                  t = re.sub(r'minSdk\s*=\s*flutter\.minSdkVersion', 'minSdk = 23', t)
+                  t = re.sub(r'minSdkVersion\s+flutter\.minSdkVersion', 'minSdkVersion 23', t)
+                  g.write_text(t)
+          EOF
+          grep -n "minSdk" android/app/build.gradle* || true
+
+      # Même clé de signature d'une version à l'autre : les mises à jour s'installent
+      # par-dessus l'ancienne version sans la désinstaller.
+      # Priorité au secret ANDROID_SIGNING_KEYSTORE (keystore en base64) s'il existe,
+      # sinon la clé générée au premier build est conservée dans le cache GitHub.
+      - name: Restaurer la clé de signature
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-signing-keystore-v1
+
+      - name: Clé de signature depuis les secrets (si configurée)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_SIGNING_KEYSTORE }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            mkdir -p ~/.android && echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+            echo "Clé du secret utilisée"
+          fi
+
+      - name: Dépendances
+        run: flutter pub get
+
+      - name: Analyse
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Tests
+        run: flutter test
+
+      - name: Construire l'APK
+        run: |
+          flutter build apk --release \
+            --build-name=0.1.${{ github.run_number }} --build-number=${{ github.run_number }} \
+            --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
+          cp build/app/outputs/flutter-apk/app-release.apk eglise-connect.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eglise-connect-apk
+          path: mobile/eglise-connect.apk
+
+      - name: Publier la version
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: Église Connect 0.1.${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            APK Android à installer sur le téléphone : touchez **eglise-connect.apk** ci-dessous.
+            ${{ vars.API_BASE_URL == '' && 'Mode démonstration (aucun serveur configuré).' || '' }}
+            Branche : ${{ github.ref_name }} · commit ${{ github.sha }}
+          files: mobile/eglise-connect.apk
