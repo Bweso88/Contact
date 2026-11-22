@@ -33,6 +33,10 @@ dependencies:
   # Alertes sonores de la chaîne de prière (programmées sur le téléphone)
   flutter_local_notifications: ^19.4.0
   timezone: ^0.10.1
+  # Export Excel des listes, puis partage (WhatsApp, e-mail, Drive…)
+  excel: ^4.0.6
+  share_plus: ^10.1.4
+  path_provider: ^2.1.5
   # Dates en français (version imposée par flutter_localizations)
   intl: any
 

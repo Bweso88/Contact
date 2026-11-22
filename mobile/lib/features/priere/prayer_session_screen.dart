@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/excel_export.dart';
 import '../../core/formatters.dart';
 import '../../core/prayer_alerts.dart';
 import '../../core/theme.dart';
@@ -151,6 +152,47 @@ class _PrayerSessionScreenState extends ConsumerState<PrayerSessionScreen> {
     unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
   }
 
+  Future<void> _export(PrayerLiveState st) => ExcelExport.share(
+    context,
+    fileName: st.session.title,
+    sheets: [
+      ExportSheet(
+        'Planning',
+        const ['Début', 'Fin', 'Intercesseur', 'Assemblée', 'Temps prié (min)', 'Situation'],
+        [
+          for (final sl in st.slots)
+            [
+              sl.startsAt,
+              sl.endsAt,
+              sl.person.name,
+              sl.person.assembly,
+              st.prayedDuring(sl).inMinutes,
+              st.currentTurn?.slotUuid == sl.uuid
+                  ? 'Prie maintenant'
+                  : sl.isPast(st.now)
+                  ? (st.prayedDuring(sl) > Duration.zero ? 'A fini de prier' : 'Créneau non tenu')
+                  : 'À venir',
+            ],
+        ],
+      ),
+      ExportSheet(
+        'Tours de prière',
+        const ['Intercesseur', 'Assemblée', 'Feu / eau', 'Début', 'Fin', 'Durée (min)', 'Fin automatique'],
+        [
+          for (final t in st.turns)
+            [t.person.name, t.person.assembly, t.visual.label, t.startedAt, t.endedAt, t.duration(st.now).inMinutes, t.autoEnded],
+        ],
+      ),
+      ExportSheet(
+        'Messages',
+        const ['Date', 'Auteur', 'Message'],
+        [
+          for (final m in st.messages.reversed) [m.createdAt, m.person.name, m.body],
+        ],
+      ),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final live = ref.watch(prayerLiveProvider(widget.uuid));
@@ -169,6 +211,8 @@ class _PrayerSessionScreenState extends ConsumerState<PrayerSessionScreen> {
         appBar: AppBar(
           title: Text(live.valueOrNull?.session.title ?? 'Chaîne de prière', style: HF.heading(18, color: _Night.text)),
           actions: [
+            if (live.valueOrNull != null && (me?.can('prayer.manage') ?? false))
+              ExportButton(onPressed: () => _export(live.value!)),
             if (live.valueOrNull != null)
               IconButton(
                 tooltip: 'Partager sur WhatsApp',

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/database.dart';
+import '../../core/excel_export.dart';
 import '../../core/formatters.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
@@ -61,8 +62,37 @@ class _BilanScreenState extends ConsumerState<BilanScreen> {
     final stats = ref.watch(statsProvider(_period));
     final sync = ref.watch(syncControllerProvider);
 
+    Future<void> export(DashboardStats s) => ExcelExport.share(
+      context,
+      fileName: 'Bilan ${_period.label}',
+      sheets: [
+        ExportSheet(
+          'Indicateurs',
+          const ['Indicateur', 'Valeur'],
+          [
+            ['Période', '${_period.label} (depuis le ${formatDate(_period.since)})'],
+            ['Contacts enregistrés (total)', s.total],
+            ['Nouveaux contacts', s.newContacts],
+            ['Contacts évangélisation', s.evangelisation],
+            ['Nouveaux visiteurs', s.newVisitors],
+            ['Suivis en attente', s.pendingFollowUps],
+            ['Personnes revenues', s.returned],
+            ['Personnes intégrées', s.integrated],
+          ],
+        ),
+        ExportSheet(
+          'Par statut',
+          const ['Statut', 'Nombre'],
+          [
+            for (final st in ContactStatus.values) [st.label, s.byStatus[st] ?? 0],
+          ],
+        ),
+      ],
+    );
+    final canExport = user?.can('reports.view') ?? false;
+
     return Scaffold(
-      appBar: const HFTopBar(),
+      appBar: HFTopBar(actions: [if (canExport && stats.hasValue) ExportButton(onPressed: () => export(stats.requireValue))]),
       body: RefreshIndicator(
         color: HF.terracotta,
         onRefresh: () => ref.read(syncControllerProvider.notifier).syncNow(),

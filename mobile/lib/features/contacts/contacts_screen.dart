@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/database.dart';
+import '../../core/excel_export.dart';
 import '../../core/formatters.dart';
 import '../../core/launcher.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../models/enums.dart';
 import '../../repositories/contact_repository.dart';
+import '../../services/auth_controller.dart';
 import '../shell/home_shell.dart';
 import '../suivi/follow_up_sheets.dart';
 
@@ -43,14 +45,67 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     super.dispose();
   }
 
+  /// Exporte la liste affichée (même recherche, même filtre), sans limite de nombre.
+  Future<void> _export() async {
+    final items = await ref.read(contactRepositoryProvider).list(search: _query, filter: _filter, limit: 100000);
+    if (!mounted) return;
+    await ExcelExport.share(
+      context,
+      fileName: 'Contacts ${_filter.label}',
+      sheets: [
+        ExportSheet(
+          'Contacts',
+          const [
+            'Prénom',
+            'Nom',
+            'Téléphone',
+            'Quartier',
+            'Arrondissement',
+            'Origine',
+            'Statut',
+            'Première rencontre',
+            'Équipe',
+            'Suivi par',
+            'Moyen préféré',
+            'Accepte d’être recontacté',
+            'Dernier suivi',
+            'Prochaine relance',
+            'Dernière note',
+          ],
+          [
+            for (final i in items)
+              [
+                i.contact.firstName,
+                i.contact.lastName,
+                i.contact.phone,
+                i.contact.neighborhood,
+                i.contact.arrondissement,
+                i.contact.source.label,
+                i.contact.status.label,
+                formatDate(i.contact.firstMetAt),
+                i.contact.teamName,
+                i.contact.assignedUserName,
+                i.contact.preferredChannel?.label,
+                i.contact.canBeContacted,
+                i.contact.lastFollowUpAt,
+                i.nextFollowUpAt,
+                i.lastNote,
+              ],
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final list = ref.watch(contactListProvider((search: _query, filter: _filter)));
     final counts = ref.watch(contactFilterCountsProvider).valueOrNull ?? const {};
     final due = ref.watch(dueCountProvider).valueOrNull ?? 0;
+    final canExport = ref.watch(currentUserProvider)?.can('contacts.export') ?? false;
 
     return Scaffold(
-      appBar: const HFTopBar(),
+      appBar: HFTopBar(actions: [if (canExport) ExportButton(onPressed: _export)]),
       floatingActionButton: DecoratedBox(
         decoration: const BoxDecoration(shape: BoxShape.circle, boxShadow: HF.primaryGlow),
         child: FloatingActionButton(

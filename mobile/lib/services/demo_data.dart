@@ -42,6 +42,7 @@ abstract final class DemoData {
             'integrations.confirm',
             'prayer.access',
             'prayer.manage',
+            'contacts.export',
           ],
           teams: const [UserTeam(id: 1, name: 'Équipe évangélisation A', isLeader: true)],
         );

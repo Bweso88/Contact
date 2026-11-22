@@ -248,9 +248,10 @@ class ActionTile extends StatelessWidget {
 
 /// Barre du haut commune : nom de l'église, état réseau, avatar (→ profil).
 class HFTopBar extends ConsumerWidget implements PreferredSizeWidget {
-  const HFTopBar({super.key, this.title});
+  const HFTopBar({super.key, this.title, this.actions = const []});
 
   final String? title;
+  final List<Widget> actions;
 
   @override
   Size get preferredSize => const Size.fromHeight(64);
@@ -285,6 +286,7 @@ class HFTopBar extends ConsumerWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
+        ...actions,
         Padding(
           padding: const EdgeInsets.only(right: 12),
           child: InkResponse(

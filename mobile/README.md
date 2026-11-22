@@ -175,6 +175,20 @@ Règles côté serveur :
 - **Permissions** : chaque opération est vérifiée comme un appel normal ; `changes` ne contient que ce que l'utilisateur a le droit de voir.
 - `status_change` vers `integre` est toujours refusé (il passe par la confirmation d'intégration).
 
+## Export Excel
+
+Bouton ⬇ dans la barre du haut : le fichier `.xlsx` s'ouvre dans le partage du téléphone
+(WhatsApp, e-mail, Google Drive, Fichiers…).
+
+| Liste | Contenu | Permission |
+|---|---|---|
+| Contacts | La liste affichée (même recherche, même filtre), toutes colonnes utiles | `contacts.export` |
+| Suivi | Relances en retard, du jour et à venir | `contacts.export` |
+| Bilan | Indicateurs de la période + répartition par statut | `reports.view` |
+| Chaîne de prière | Planning, tours (feu/eau, durées), messages | `prayer.manage` |
+
+Les exports contiennent des données personnelles : ils restent réservés à ces rôles (cahier des charges, section 8).
+
 ## Chaîne de prière
 
 Module à part pour les intercesseurs, qui prient chacun chez soi, l'un après l'autre.

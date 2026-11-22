@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/database.dart';
+import '../../core/excel_export.dart';
 import '../../core/formatters.dart';
 import '../../core/launcher.dart';
 import '../../core/theme.dart';
@@ -42,8 +43,24 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     final today = ref.watch(dueFollowUpsProvider((bucket: FollowUpBucket.today, mineOnly: mine))).valueOrNull ?? const [];
     final upcoming = ref.watch(dueFollowUpsProvider((bucket: FollowUpBucket.upcoming, mineOnly: mine))).valueOrNull ?? const [];
 
+    Future<void> export() => ExcelExport.share(
+      context,
+      fileName: 'Relances',
+      sheets: [
+        ExportSheet(
+          'Relances',
+          const ['Échéance', 'Situation', 'Personne', 'Téléphone', 'Action', 'Responsable', 'Commentaire'],
+          [
+            for (final (label, list) in [('En retard', overdue), ('Aujourd’hui', today), ('À venir', upcoming)])
+              for (final f in list)
+                [f.scheduledAt, label, f.contactName, f.contactPhone, f.actionType.label, f.userName, f.description],
+          ],
+        ),
+      ],
+    );
+
     return Scaffold(
-      appBar: const HFTopBar(),
+      appBar: HFTopBar(actions: [if (user?.can('contacts.export') ?? false) ExportButton(onPressed: export)]),
       body: RefreshIndicator(
         color: HF.terracotta,
         onRefresh: () async => ref.read(dataRevisionProvider.notifier).bump(),
