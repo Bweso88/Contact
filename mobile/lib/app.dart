@@ -81,6 +81,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [GoRoute(path: '/suivi', builder: (_, __) => const SuiviScreen())],
           ),
           StatefulShellBranch(
+            routes: [GoRoute(path: '/priere', builder: (_, __) => const PrayerHomeScreen())],
+          ),
+          StatefulShellBranch(
             routes: [GoRoute(path: '/bilan', builder: (_, __) => const BilanScreen())],
           ),
         ],
